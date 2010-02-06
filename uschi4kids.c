@@ -1,3 +1,15 @@
+/*
+ * uschi4kids - LD_PRELOAD based DNS filter
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * authors:
+ * (c) 2009  Matthias Wenzel <zenzursula at mazzoo dot de>
+ *
+ */
+
 #define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
