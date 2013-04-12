@@ -9,9 +9,17 @@
 #include <fcntl.h>
 #include <dlfcn.h>
 
+#define DEBUG
+#ifdef DEBUG
+# define verbprintf printf
+#else
+# define verbprintf(x, ...)
+#endif
 
-#define FILE_UID "/etc/uschi4kids.uid"
-#define FILE_URL "/etc/uschi4kids.url"
+
+#define FILE_UID     "/etc/uschi4kids.uid"
+#define FILE_URL     "/etc/uschi4kids.url"
+#define FILE_BLOCKED "/tmp/uschi4kids.blocked.txt"
 
 #define BUFSZ 4096
 char linebuf[BUFSZ];
@@ -31,22 +39,10 @@ struct hostent invalid_host;
 /**************************************************************/
 /* init */
 
-void uschi_exit(void)
-{
-	//printf("byebye.\n\n");
-}
-
 static int is_initialized = 0;
 
 void init_user_list(void)
 {
-	allowed_user = malloc(sizeof(*allowed_user));
-	if (!allowed_user)
-		return; /* uh-oh, this disables all DNS */
-
-	allowed_user->next = NULL;
-	allowed_user->uid  = 0; /* allmighty root */
-
 	FILE * fd = fopen(FILE_UID, "r");
 	if (!fd)
 		return;
@@ -66,7 +62,7 @@ void init_user_list(void)
 		uid = strtol(linebuf, &end, 0);
 		if (end == linebuf) {
 			fprintf(stderr, "parse error in %s:%d\n",
-				FILE_UID, lineno);
+					FILE_UID, lineno);
 			goto out;
 		}
 		/* list handling */
@@ -77,7 +73,6 @@ void init_user_list(void)
 		/* fill in list */
 		p->next = NULL;
 		p->uid = uid;
-		printf("allowing user %d\n", uid);
 	}
 out:
 	fclose(fd);
@@ -114,7 +109,7 @@ void init_url_list(void)
 			linebuf[strlen(linebuf)-1] = 0;
 		/* fill in list */
 		p->url = strndup(linebuf, BUFSZ);
-		printf("allowing url %s\n", p->url);
+		printf("allowing %s\n", p->url);
 	}
 out:
 	fclose(fd);
@@ -124,7 +119,6 @@ static inline void init(void)
 {
 	if (is_initialized)
 		return;
-	atexit(uschi_exit);
 
 	init_user_list();
 	init_url_list();
@@ -133,11 +127,32 @@ static inline void init(void)
 }
 
 /**************************************************************/
+/* logging of blocked URLs */
+
+void log_blocked(const char * url)
+{
+	static int fh_blocked = -1;
+	static FILE * fp_blocked = NULL;
+	if (fh_blocked < 0)
+	{
+		fh_blocked = open(FILE_BLOCKED, O_RDWR | O_TRUNC | O_CREAT, 0644);
+		fp_blocked = fdopen(fh_blocked, "w");
+	}
+	fprintf(fp_blocked, "%s\n", url);
+	fflush(fp_blocked);
+}
+
+/**************************************************************/
 /* checking legacy users/URLs */
 
 int is_allowed_user(uid_t uid)
 {
 	struct allowed_user_t *p = allowed_user;
+
+	/* root is almighty */
+	if (uid == 0)
+		return 1;
+
 	while (p) {
 		if (uid == p->uid)
 			return 1;
@@ -145,6 +160,87 @@ int is_allowed_user(uid_t uid)
 	}
 	return 0;
 }
+
+int is_ipv4_addr(const char * url)
+{
+	char * p = (char *) url;
+	while (*p)
+	{
+		if (
+		     (*p != '.') &&
+		     ( (*p < '0') || (*p > '9') )
+		   )
+			return 0;
+		p++;
+	}
+
+	/* OK, url is made up of numbers and dots only */
+
+	int digitcount = 1;
+	p = (char *) url;
+	if (*p == '.')
+		return 0;
+	p++;
+	while ( *p && *p != '.')
+	{
+		digitcount++;
+		p++;
+	}
+	if (digitcount > 3)
+		return 0;
+	if (!*p)
+		return 0;
+	p++;
+
+	digitcount = 0;
+	if (*p == '.')
+		return 0;
+	p++;
+	while ( *p && *p != '.')
+	{
+		digitcount++;
+		p++;
+	}
+	if (digitcount > 3)
+		return 0;
+	if (!*p)
+		return 0;
+	p++;
+
+	digitcount = 0;
+	if (*p == '.')
+		return 0;
+	p++;
+	while ( *p && *p != '.')
+	{
+		digitcount++;
+		p++;
+	}
+	if (digitcount > 3)
+		return 0;
+	if (!*p)
+		return 0;
+	p++;
+
+	digitcount = 0;
+	if (*p == '.')
+		return 0;
+	p++;
+	while ( *p && *p != '.')
+	{
+		digitcount++;
+		p++;
+	}
+	if (digitcount > 3)
+		return 0;
+	if (*p) /* must be end of string */
+		return 0;
+	p++;
+
+
+	return 1;
+}
+
 int is_allowed_url(const char * url)
 {
 	struct allowed_url_t *p = allowed_url;
@@ -160,8 +256,13 @@ int is_allowed(const char * url)
 {
 	if (is_allowed_user(getuid()))
 		return 1;
+	if (is_ipv4_addr(url))
+		return 1;
 	if (is_allowed_url(url))
 		return 1;
+
+	log_blocked(url);
+
 	return 0;
 
 }
