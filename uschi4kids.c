@@ -243,10 +243,27 @@ int is_ipv4_addr(const char * url)
 
 int is_allowed_url(const char * url)
 {
-	struct allowed_url_t *p = allowed_url;
+	struct allowed_url_t * p = allowed_url;
+
+	int len_lookup_url = strlen(url);
+
 	while (p) {
-		if (!strcmp(url, p->url))
-			return 1;
+		if (p->url[0] == '*') /* wildcard */
+		{
+			int len_list_url = strlen(&p->url[1]);
+			if (len_lookup_url >= len_list_url)
+			{
+
+				if (!strcmp(&p->url[1], &url[ len_lookup_url - len_list_url ]))
+				{
+					return 1;
+				}
+
+			}
+		}else{
+			if (!strcmp(url, p->url))
+				return 1;
+		}
 		p = p->next;
 	}
 	return 0;
