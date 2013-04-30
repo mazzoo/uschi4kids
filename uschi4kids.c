@@ -124,7 +124,7 @@ void init_url_list(void)
 			linebuf[strlen(linebuf)-1] = 0;
 		/* fill in list */
 		p->url = strndup(linebuf, BUFSZ);
-		printf("allowing %s\n", p->url);
+		//printf("allowing %s\n", p->url);
 	}
 out:
 	fclose(fd);
