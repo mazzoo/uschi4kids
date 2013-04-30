@@ -2,7 +2,7 @@ all: uschi4kids.so
 
 
 uschi4kids.so:uschi4kids.c
-	$(CC) -Wall -g -fPIC -shared -ldl -o $@ $^
+	$(CC) -Wall -g -fPIC -shared -ldl -lpthread -o $@ $^
 
 clean:
 	$(RM) uschi4kids.so

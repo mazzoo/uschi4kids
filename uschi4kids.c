@@ -8,6 +8,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dlfcn.h>
+#include <arpa/inet.h>
+#include <pthread.h>
+
 
 #define DEBUG
 #ifdef DEBUG
@@ -163,82 +166,24 @@ int is_allowed_user(uid_t uid)
 
 int is_ipv4_addr(const char * url)
 {
-	char * p = (char *) url;
-	while (*p)
+	struct in_addr result;
+
+	if (inet_pton(AF_INET, url, &result) == 1)
 	{
-		if (
-		     (*p != '.') &&
-		     ( (*p < '0') || (*p > '9') )
-		   )
-			return 0;
-		p++;
+		return 1;
 	}
+	return 0;
+}
 
-	/* OK, url is made up of numbers and dots only */
+int is_ipv6_addr(const char * url)
+{
+	struct in6_addr result;
 
-	int digitcount = 1;
-	p = (char *) url;
-	if (*p == '.')
-		return 0;
-	p++;
-	while ( *p && *p != '.')
+	if (inet_pton(AF_INET6, url, &result) == 1)
 	{
-		digitcount++;
-		p++;
+		return 1;
 	}
-	if (digitcount > 3)
-		return 0;
-	if (!*p)
-		return 0;
-	p++;
-
-	digitcount = 0;
-	if (*p == '.')
-		return 0;
-	p++;
-	while ( *p && *p != '.')
-	{
-		digitcount++;
-		p++;
-	}
-	if (digitcount > 3)
-		return 0;
-	if (!*p)
-		return 0;
-	p++;
-
-	digitcount = 0;
-	if (*p == '.')
-		return 0;
-	p++;
-	while ( *p && *p != '.')
-	{
-		digitcount++;
-		p++;
-	}
-	if (digitcount > 3)
-		return 0;
-	if (!*p)
-		return 0;
-	p++;
-
-	digitcount = 0;
-	if (*p == '.')
-		return 0;
-	p++;
-	while ( *p && *p != '.')
-	{
-		digitcount++;
-		p++;
-	}
-	if (digitcount > 3)
-		return 0;
-	if (*p) /* must be end of string */
-		return 0;
-	p++;
-
-
-	return 1;
+	return 0;
 }
 
 int is_allowed_url(const char * url)
@@ -275,13 +220,14 @@ int is_allowed(const char * url)
 		return 1;
 	if (is_ipv4_addr(url))
 		return 1;
+	if (is_ipv6_addr(url))
+		return 1;
 	if (is_allowed_url(url))
 		return 1;
 
 	log_blocked(url);
 
 	return 0;
-
 }
 
 /**************************************************************/
@@ -380,6 +326,7 @@ int gethostent_r(
 }
 
 
+#if 0
 int inet_pton(int af, const char *src, void *dst)
 {
 	init();
@@ -394,6 +341,7 @@ int inet_pton(int af, const char *src, void *dst)
 
 	return func(af, src, dst);
 }
+#endif
 
 int getaddrinfo(const char *node, const char *service,
 		const struct addrinfo *hints,
